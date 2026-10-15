@@ -42,6 +42,7 @@ import java.util.HashSet;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.*;
 
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -351,20 +352,34 @@ public class HomePrintableComponent extends JComponent implements Printable {
           && (homePrint == null
               || homePrint.isPlanPrinted()
               || homePrint.isView3DPrinted())) {
-        final Level selectedLevel = home.getSelectedLevel();
         furnitureTable = (FurnitureTable)furnitureView;
         furnitureFilter = furnitureTable.getFurnitureFilter();
         furnitureTable.setFurnitureFilter(new FurnitureTable.FurnitureFilter() {
-            public boolean include(Home home, HomePieceOfFurniture piece) {
-              // Print only furniture at selected level when the plan or the 3D view is printed
-              return (furnitureFilter == null || furnitureFilter.include(home, piece))
-                  && piece.isAtLevel(selectedLevel)
-                  && (piece.getLevel() == null || piece.getLevel().isViewable());
-            }
-          });
+          public boolean include(Home home, HomePieceOfFurniture piece) {
+            // Print only furniture that is viewable and part of plan
+            return (furnitureFilter == null || furnitureFilter.include(home, piece))
+                    && (piece.getLevel() == null || piece.getLevel().isViewable());
+          }
+        });
       } else {
         furnitureFilter = null;
       }
+
+      boolean visible = false;
+      int index = 0;
+      HomePieceOfFurniture.SortableProperty level = HomePieceOfFurniture.SortableProperty.LEVEL;
+
+      // adds the LEVEL column to the home FurnitureVisibleProperties if
+      // the column is not already visible
+      List<HomePieceOfFurniture.SortableProperty> furnitureVisibleProperties = new ArrayList<>(this.home.getFurnitureVisibleProperties());
+      if (furnitureVisibleProperties.contains(level)) {
+        index = furnitureVisibleProperties.indexOf(level);
+        furnitureVisibleProperties.remove(level);
+        visible = true;
+      }
+      furnitureVisibleProperties.add(level);
+      this.home.setFurnitureVisibleProperties(furnitureVisibleProperties);
+
       // Try to print next furniture view page      
       pageExists = ((Printable)furnitureView).print(g2D, pageFormat, page);
       if (furnitureTable != null) {
@@ -376,7 +391,18 @@ public class HomePrintableComponent extends JComponent implements Printable {
         this.printablePages.add(page);
         this.furniturePageCount++;
       }
+
+    // removes the LEVEL column from home FurnitureVisibleProperties
+    // if the column was originally visible then FurnitureVisibleProperties is reordered
+    // to match original index
+    furnitureVisibleProperties = new ArrayList<>(this.home.getFurnitureVisibleProperties());
+    furnitureVisibleProperties.remove(level);
+    if (visible) {
+      furnitureVisibleProperties.add(index, level);
     }
+    this.home.setFurnitureVisibleProperties(furnitureVisibleProperties);
+
+  }
     if (pageExists == NO_SUCH_PAGE 
         && planView != null 
         && (homePrint == null || homePrint.isPlanPrinted())) {
